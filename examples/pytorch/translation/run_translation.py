@@ -395,6 +395,8 @@ def main():
 
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.
+    if training_args.do_predict:
+        training_args.do_eval = False
     if training_args.do_train:
         column_names = raw_datasets["train"].column_names
     elif training_args.do_eval:
@@ -500,6 +502,7 @@ def main():
         if data_args.max_predict_samples is not None:
             max_predict_samples = min(len(predict_dataset), data_args.max_predict_samples)
             predict_dataset = predict_dataset.select(range(max_predict_samples))
+        raw_test_dataset = predict_dataset
         with training_args.main_process_first(desc="prediction dataset map pre-processing"):
             predict_dataset = predict_dataset.map(
                 preprocess_function,
@@ -622,9 +625,17 @@ def main():
                     predict_results.predictions, skip_special_tokens=True, clean_up_tokenization_spaces=True
                 )
                 predictions = [pred.strip() for pred in predictions]
+                inputs = list(raw_test_dataset)[:len(predictions)]
+                inputs = list(map(lambda sample: sample["translation"]["en"], inputs))
                 output_prediction_file = os.path.join(training_args.output_dir, "generated_predictions.txt")
                 with open(output_prediction_file, "w", encoding="utf-8") as writer:
-                    writer.write("\n".join(predictions))
+                    divider = "----------------------------------------"
+                    for (original, prediction) in zip(inputs, predictions):
+                        writer.write(f"\n{divider}\nInput\n{original}\n\nTest case spec\n{prediction}\n")
+                output_prediction_file = os.path.join(training_args.output_dir, "raw_predictions.txt")
+                with open(output_prediction_file, "w", encoding="utf-8") as writer:
+                    for (original, prediction) in zip(inputs, predictions):
+                        writer.write(f"{escape(prediction)}\n")
 
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "translation"}
     if data_args.dataset_name is not None:
@@ -645,6 +656,9 @@ def main():
         trainer.create_model_card(**kwargs)
 
     return results
+
+def escape(s: str):
+    return s.replace('\\', '\\backslash').replace('\n', '\\n')
 
 
 def _mp_fn(index):

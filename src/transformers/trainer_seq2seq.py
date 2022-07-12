@@ -17,12 +17,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
 from torch.utils.data import Dataset
+import random
+from datetime import datetime
 
 from .deepspeed import is_deepspeed_zero3_enabled
 from .trainer import Trainer
-from .trainer_utils import PredictionOutput
+from .trainer_utils import PredictionOutput, set_seed
 from .utils import logging
-
 
 logger = logging.get_logger(__name__)
 
@@ -129,9 +130,12 @@ class Seq2SeqTrainer(Trainer):
         gen_kwargs["max_length"] = (
             gen_kwargs["max_length"] if gen_kwargs.get("max_length") is not None else self.args.generation_max_length
         )
-        gen_kwargs["num_beams"] = (
-            gen_kwargs["num_beams"] if gen_kwargs.get("num_beams") is not None else self.args.generation_num_beams
-        )
+        # gen_kwargs["num_beams"] = (
+        #     gen_kwargs["num_beams"] if gen_kwargs.get("num_beams") is not None else self.args.generation_num_beams
+        # )
+        gen_kwargs["do_sample"] = True
+        gen_kwargs["top_k"] = 0
+        gen_kwargs["temperature"] = 1.0
         self._gen_kwargs = gen_kwargs
 
         return super().predict(test_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)
@@ -177,9 +181,12 @@ class Seq2SeqTrainer(Trainer):
         gen_kwargs["max_length"] = (
             gen_kwargs["max_length"] if gen_kwargs.get("max_length") is not None else self.model.config.max_length
         )
-        gen_kwargs["num_beams"] = (
-            gen_kwargs["num_beams"] if gen_kwargs.get("num_beams") is not None else self.model.config.num_beams
-        )
+        # gen_kwargs["num_beams"] = (
+        #     gen_kwargs["num_beams"] if gen_kwargs.get("num_beams") is not None else self.model.config.num_beams
+        # )
+        gen_kwargs["do_sample"] = True
+        gen_kwargs["top_k"] = 0
+        gen_kwargs["temperature"] = 1.0
         default_synced_gpus = True if is_deepspeed_zero3_enabled() else False
         gen_kwargs["synced_gpus"] = (
             gen_kwargs["synced_gpus"] if gen_kwargs.get("synced_gpus") is not None else default_synced_gpus
@@ -198,6 +205,8 @@ class Seq2SeqTrainer(Trainer):
         else:
             generation_inputs = inputs[self.model.main_input_name]
 
+        random.seed(datetime.now())
+        set_seed(random.randint(0, 10**9))
         generated_tokens = self.model.generate(
             generation_inputs,
             **gen_kwargs,

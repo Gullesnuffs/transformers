@@ -626,7 +626,7 @@ def main():
                 )
                 predictions = [pred.strip() for pred in predictions]
                 inputs = list(raw_test_dataset)[:len(predictions)]
-                inputs = list(map(lambda sample: sample["translation"]["en"], inputs))
+                inputs = list(map(lambda sample: sample["translation"]["from"], inputs))
                 output_prediction_file = os.path.join(training_args.output_dir, "generated_predictions.txt")
                 with open(output_prediction_file, "w", encoding="utf-8") as writer:
                     divider = "----------------------------------------"
